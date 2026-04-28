@@ -52,7 +52,7 @@ function groupByDate(
 }
 
 function TaskCard({ task }: { task: OptimisticTask }) {
-  const removeTask = useTasksStore((s) => s.removeTask);
+  const { removeTask, addOptimisticTask } = useTasksStore();
 
   async function handleDelete() {
     removeTask(task.id);
@@ -60,9 +60,8 @@ function TaskCard({ task }: { task: OptimisticTask }) {
     if (!task.isOptimistic) {
       const result = await deleteTask(task.id);
       if (!result.success) {
-        toast.error(`Delete failed: ${result.error}`);
-        // No re-add here — keep it gone optimistically to avoid flicker;
-        // a hard refresh will restore it if truly not deleted.
+        addOptimisticTask({ ...task, isOptimistic: false });
+        toast.error(`Couldn't delete task: ${result.error}`);
       }
     }
   }

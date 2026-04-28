@@ -3,6 +3,7 @@ export type TaskStatus = "pending" | "completed";
 
 export interface Task {
   id: string;
+  user_id: string;
   title: string;
   due_date: string | null;
   priority: TaskPriority;

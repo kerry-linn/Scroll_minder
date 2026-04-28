@@ -4,7 +4,6 @@
   "project": ["**/*.{ts,tsx}", "!.next/**", "!node_modules/**"],
   "ignoreDependencies": [
     "shadcn",
-    "@biomejs/biome",
     "tailwindcss",
     "postcss",
     "tw-animate-css"

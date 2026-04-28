@@ -1,34 +1,32 @@
 "use server";
 
-import { getSupabaseServer } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CreateTaskInput, Task } from "@/lib/tasks/types";
 
 export type CreateTaskResult =
   | { success: true; task: Task }
   | { success: false; error: string };
 
-const CONFIG_ERROR =
-  "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and an API key in .env.local.";
-
-function getClient() {
-  try {
-    return getSupabaseServer();
-  } catch {
-    return null;
-  }
-}
+export type DeleteTaskResult =
+  | { success: true }
+  | { success: false; error: string };
 
 export async function createTask(
   input: CreateTaskInput
 ): Promise<CreateTaskResult> {
-  const client = getClient();
-  if (!client) {
-    return { success: false, error: CONFIG_ERROR };
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Session expired. Please sign in again." };
   }
 
-  const { data, error } = await client
+  const { data, error } = await supabase
     .from("tasks")
     .insert({
+      user_id: user.id,
       title: input.title,
       due_date: input.due_date,
       priority: input.priority,
@@ -40,24 +38,28 @@ export async function createTask(
   if (error || !data) {
     return {
       success: false,
-      error: error?.message ?? "Unknown error inserting task",
+      error: error?.message ?? "Unknown error inserting task.",
     };
   }
 
   return { success: true, task: data as Task };
 }
 
-export type DeleteTaskResult =
-  | { success: true }
-  | { success: false; error: string };
-
 export async function deleteTask(id: string): Promise<DeleteTaskResult> {
-  const client = getClient();
-  if (!client) {
-    return { success: false, error: CONFIG_ERROR };
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { success: false, error: "Session expired. Please sign in again." };
   }
 
-  const { error } = await client.from("tasks").delete().eq("id", id);
+  const { error } = await supabase
+    .from("tasks")
+    .delete()
+    .eq("id", id)
+    .eq("user_id", user.id);
 
   if (error) {
     return { success: false, error: error.message };
@@ -67,12 +69,17 @@ export async function deleteTask(id: string): Promise<DeleteTaskResult> {
 }
 
 export async function fetchPendingTasks(): Promise<Task[]> {
-  const client = getClient();
-  if (!client) return [];
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  const { data, error } = await client
+  if (!user) return [];
+
+  const { data, error } = await supabase
     .from("tasks")
     .select()
+    .eq("user_id", user.id)
     .eq("status", "pending")
     .order("due_date", { ascending: true, nullsFirst: false })
     .order("created_at", { ascending: true });

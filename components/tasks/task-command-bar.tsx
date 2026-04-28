@@ -54,6 +54,7 @@ export function TaskCommandBar() {
 
     addOptimisticTask({
       id: tempId,
+      user_id: "",
       title: trimmed,
       due_date: dueDateIso,
       priority,

@@ -1,10 +1,29 @@
-import { fetchPendingTasks } from "@/app/actions/tasks";
-import { TasksApp } from "@/components/tasks/tasks-app";
+import { Suspense } from "react";
+import { TaskFeedSkeleton } from "@/components/tasks/task-feed-skeleton";
+import { TasksLoader } from "@/components/tasks/tasks-loader";
+import { Skeleton } from "@/components/ui/skeleton";
 
-export const dynamic = "force-dynamic";
+function AppShellSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden">
+      <header className="flex items-center justify-between border-b border-border px-4 py-4">
+        <div className="w-16" />
+        <Skeleton className="h-3 w-32" />
+        <div className="w-16" />
+      </header>
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-3xl">
+          <TaskFeedSkeleton />
+        </div>
+      </main>
+    </div>
+  );
+}
 
-export default async function Home() {
-  const initialTasks = await fetchPendingTasks();
-
-  return <TasksApp initialTasks={initialTasks} />;
+export default function Home() {
+  return (
+    <Suspense fallback={<AppShellSkeleton />}>
+      <TasksLoader />
+    </Suspense>
+  );
 }

@@ -1,36 +1,45 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-let _client: SupabaseClient | null = null;
-
-function resolveSupabaseUrl(): string | undefined {
-  return (
-    process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() ||
-    process.env.SUPABASE_URL?.trim()
-  );
-}
-
-function resolveSupabaseKey(): string | undefined {
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ??
-    process.env.SUPABASE_ANON_KEY?.trim() ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ??
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY?.trim();
-  return key;
-}
-
-/** Returns a lazily-initialized Supabase client for server-side use. */
-export function getSupabaseServer(): SupabaseClient {
-  if (_client) return _client;
-
-  const url = resolveSupabaseUrl();
-  const key = resolveSupabaseKey();
+function getEnv() {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
+  const key = (
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
+  )?.trim();
 
   if (!url || !key) {
     throw new Error(
-      "Missing Supabase env vars. Add NEXT_PUBLIC_SUPABASE_URL plus one key: SUPABASE_SERVICE_ROLE_KEY (recommended for trusted server inserts) OR NEXT_PUBLIC_SUPABASE_ANON_KEY / NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY."
+      "Missing Supabase env vars. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in .env.local."
     );
   }
 
-  _client = createClient(url, key, { auth: { persistSession: false } });
-  return _client;
+  return { url, key };
+}
+
+/**
+ * Cookie-bound Supabase client for Server Components and Server Actions.
+ * Reads cookies but cannot set them — use the middleware client for that.
+ */
+export async function createSupabaseServerClient() {
+  const { url, key } = getEnv();
+  const cookieStore = await cookies();
+
+  return createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          for (const { name, value, options } of cookiesToSet) {
+            cookieStore.set(name, value, options);
+          }
+        } catch {
+          // Server Components cannot set cookies; ignore.
+          // The middleware client refreshes the session instead.
+        }
+      },
+    },
+  });
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Toaster } from "@/components/ui/sonner";
+import { SignOutButton } from "@/components/auth/sign-out-button";
 import type { Task } from "@/lib/tasks/types";
 import { useTasksStore } from "@/stores/tasks-store";
 import { TaskCommandBar } from "./task-command-bar";
@@ -21,10 +21,14 @@ export function TasksApp({ initialTasks }: TasksAppProps) {
   return (
     <>
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="border-b border-border px-4 py-4">
-          <h1 className="text-center text-sm font-semibold tracking-widest uppercase text-foreground/70">
+        <header className="flex items-center justify-between border-b border-border px-4 py-4">
+          <div className="w-16" />
+          <h1 className="text-sm font-semibold tracking-widest uppercase text-foreground/70">
             ScrollMinder
           </h1>
+          <div className="w-16 flex justify-end">
+            <SignOutButton />
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto">
@@ -35,7 +39,6 @@ export function TasksApp({ initialTasks }: TasksAppProps) {
       </div>
 
       <TaskCommandBar />
-      <Toaster richColors position="top-center" />
     </>
   );
 }
