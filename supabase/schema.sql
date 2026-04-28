@@ -69,6 +69,25 @@ create policy "tasks_delete_own"
   using (auth.uid() = user_id);
 
 -- ============================================================
+-- Email reminder deduplication table
+-- Prevents a cron run from sending the same reminder twice for
+-- the same task+threshold combination.
+-- ============================================================
+
+create table if not exists task_email_reminders (
+  id         uuid         primary key default gen_random_uuid(),
+  task_id    uuid         not null references tasks(id) on delete cascade,
+  -- 'due_3d' for 3-day threshold, 'due_5d' for 5-day threshold
+  reminder_type text      not null,
+  sent_at    timestamptz  not null default now(),
+  unique (task_id, reminder_type)
+);
+
+-- No RLS needed: this table is only accessed by the cron via the service role.
+-- Grant access to the service role (already superuser; explicit for clarity).
+grant select, insert on table task_email_reminders to service_role;
+
+-- ============================================================
 -- Migration: if upgrading from the MVP schema (no user_id)
 -- Run only the lines below instead of the full file above.
 -- ============================================================

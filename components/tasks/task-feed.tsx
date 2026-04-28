@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { CheckIcon, Trash2 } from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
 import { deleteTask } from "@/app/actions/tasks";
 import { formatDaysRemaining } from "@/lib/tasks/date-utils";
@@ -19,6 +20,9 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
   medium: "text-amber-500",
   low: "text-muted-foreground",
 };
+
+/** Duration the user must hold before the long-press completes (ms). */
+const LONG_PRESS_MS = 600;
 
 /** Group tasks by their ISO date string (YYYY-MM-DD) or "no-date". */
 function groupByDate(
@@ -53,25 +57,71 @@ function groupByDate(
 
 function TaskCard({ task }: { task: OptimisticTask }) {
   const { removeTask, addOptimisticTask } = useTasksStore();
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pressing, setPressing] = React.useState(false);
 
-  async function handleDelete() {
+  /**
+   * Shared removal logic used by both the trash icon, the green check,
+   * and the long-press gesture. Identical behavior per the spec.
+   */
+  async function removeWithRollback(label: string) {
     removeTask(task.id);
 
     if (!task.isOptimistic) {
       const result = await deleteTask(task.id);
       if (!result.success) {
         addOptimisticTask({ ...task, isOptimistic: false });
-        toast.error(`Couldn't delete task: ${result.error}`);
+        toast.error(`${label} failed: ${result.error}`);
       }
     }
   }
 
+  function handleDelete() {
+    removeWithRollback("Couldn't delete task");
+  }
+
+  function handleComplete() {
+    toast.success(`"${task.title}" marked as complete`);
+    removeWithRollback("Couldn't complete task");
+  }
+
+  // Long-press handlers
+  function startPress() {
+    if (task.isOptimistic) return; // don't trigger on unconfirmed rows
+    setPressing(true);
+    longPressTimer.current = setTimeout(() => {
+      setPressing(false);
+      toast.success(`"${task.title}" marked as complete`);
+      removeWithRollback("Couldn't complete task");
+    }, LONG_PRESS_MS);
+  }
+
+  function cancelPress() {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current);
+      longPressTimer.current = null;
+    }
+    setPressing(false);
+  }
+
+  // Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      if (longPressTimer.current) clearTimeout(longPressTimer.current);
+    };
+  }, []);
+
   return (
     <li
       className={cn(
-        "flex items-start justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3 shadow-sm transition-opacity",
-        task.isOptimistic && "opacity-60"
+        "group flex items-start justify-between gap-4 rounded-xl border border-border bg-card px-4 py-3 shadow-sm transition-all duration-150 select-none",
+        task.isOptimistic && "opacity-60",
+        pressing && "scale-[0.98] border-green-400 ring-2 ring-green-300/50"
       )}
+      onPointerDown={startPress}
+      onPointerUp={cancelPress}
+      onPointerLeave={cancelPress}
+      onPointerCancel={cancelPress}
     >
       <span className="truncate text-sm font-medium text-foreground">
         {task.title}
@@ -83,14 +133,35 @@ function TaskCard({ task }: { task: OptimisticTask }) {
         >
           {PRIORITY_LABEL[task.priority]}
         </span>
-        <button
-          type="button"
-          onClick={handleDelete}
-          className="text-muted-foreground/40 transition-colors hover:text-destructive"
-          aria-label={`Delete "${task.title}"`}
-        >
-          <Trash2 className="size-3" />
-        </button>
+        <div className="flex items-center gap-1.5">
+          {/* Complete (green check) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleComplete();
+            }}
+            onPointerDown={(e) => e.stopPropagation()} // prevent long-press from firing too
+            className="cursor-pointer text-muted-foreground/40 transition-colors hover:text-green-500"
+            aria-label={`Complete "${task.title}"`}
+          >
+            <CheckIcon className="size-3" />
+          </button>
+
+          {/* Delete (red trash) */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDelete();
+            }}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="cursor-pointer text-muted-foreground/40 transition-colors hover:text-destructive"
+            aria-label={`Delete "${task.title}"`}
+          >
+            <Trash2 className="size-3" />
+          </button>
+        </div>
       </div>
     </li>
   );
