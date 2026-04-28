@@ -93,7 +93,6 @@ export function TaskCommandBar() {
   return (
     <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3 shadow-[0_-2px_12px_0_rgba(0,0,0,0.06)]">
       <div className="mx-auto grid max-w-3xl grid-cols-[1fr_auto_auto_auto] items-center gap-2">
-        {/* Column 1: Title input */}
         <Input
           placeholder="New task…"
           value={title}
@@ -103,7 +102,6 @@ export function TaskCommandBar() {
           className="h-9 text-sm"
         />
 
-        {/* Column 2: Date picker */}
         <Popover open={calOpen} onOpenChange={setCalOpen}>
           <PopoverTrigger
             className={cn(
@@ -135,7 +133,6 @@ export function TaskCommandBar() {
           </PopoverContent>
         </Popover>
 
-        {/* Column 3: Priority selector */}
         <Select
           value={priority}
           onValueChange={(v) => setPriority(v as TaskPriority)}
@@ -150,7 +147,6 @@ export function TaskCommandBar() {
           </SelectContent>
         </Select>
 
-        {/* Column 4: Submit */}
         <Button
           size="sm"
           className="h-9 gap-1.5 px-3"

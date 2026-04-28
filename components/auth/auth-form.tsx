@@ -41,7 +41,6 @@ export function AuthForm({ mode }: AuthFormProps) {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm space-y-6">
-        {/* Brand */}
         <div className="space-y-1 text-center">
           <h1 className="text-sm font-semibold tracking-widest uppercase text-foreground/70">
             ScrollMinder
@@ -51,7 +50,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           </p>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-3">
           <Input
             type="email"
@@ -82,7 +80,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           </Button>
         </form>
 
-        {/* Toggle */}
         <p className="text-center text-xs text-muted-foreground">
           {isLogin ? (
             <>

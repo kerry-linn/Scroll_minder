@@ -1,12 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest, NextResponse } from "next/server";
 
-/**
- * Creates a Supabase client in the context of Next.js middleware so that
- * auth tokens can be refreshed and written back to response cookies.
- *
- * The caller must pass the mutable response so cookies can be set on it.
- */
 export function createSupabaseMiddlewareClient(
   request: NextRequest,
   response: NextResponse

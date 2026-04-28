@@ -17,10 +17,6 @@ function getEnv() {
   return { url, key };
 }
 
-/**
- * Cookie-bound Supabase client for Server Components and Server Actions.
- * Reads cookies but cannot set them — use the middleware client for that.
- */
 export async function createSupabaseServerClient() {
   const { url, key } = getEnv();
   const cookieStore = await cookies();
