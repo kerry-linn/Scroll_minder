@@ -9,8 +9,7 @@ function resolveSupabaseUrl(): string | undefined {
   );
 }
 
-/** Pick the first available key — service role skips RLS; anon/publishable follow RLS. */
-export function resolveSupabaseKey(): string | undefined {
+function resolveSupabaseKey(): string | undefined {
   const key =
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ??
     process.env.SUPABASE_ANON_KEY?.trim() ??
@@ -34,8 +33,4 @@ export function getSupabaseServer(): SupabaseClient {
 
   _client = createClient(url, key, { auth: { persistSession: false } });
   return _client;
-}
-
-export function isSupabaseConfigured(): boolean {
-  return Boolean(resolveSupabaseUrl() && resolveSupabaseKey());
 }

@@ -1,6 +1,5 @@
 import {
   differenceInCalendarDays,
-  format,
   isToday,
   isTomorrow,
   isYesterday,
@@ -19,11 +18,4 @@ export function formatDaysRemaining(dueDateIso: string): string {
   if (isYesterday(due)) return "yesterday";
   if (diff > 0) return `in ${diff} days`;
   return `${Math.abs(diff)} days ago`;
-}
-
-/**
- * Formats a due date as a compact locale string for display (e.g. "Apr 30").
- */
-export function formatDueDate(dueDateIso: string): string {
-  return format(new Date(dueDateIso), "MMM d");
 }

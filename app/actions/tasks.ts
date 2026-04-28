@@ -7,21 +7,26 @@ export type CreateTaskResult =
   | { success: true; task: Task }
   | { success: false; error: string };
 
+const CONFIG_ERROR =
+  "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and an API key in .env.local.";
+
+function getClient() {
+  try {
+    return getSupabaseServer();
+  } catch {
+    return null;
+  }
+}
+
 export async function createTask(
   input: CreateTaskInput
 ): Promise<CreateTaskResult> {
-  let supabase;
-  try {
-    supabase = getSupabaseServer();
-  } catch {
-    return {
-      success: false,
-      error:
-        "Supabase is not configured. Add NEXT_PUBLIC_SUPABASE_URL and an API key in .env.local (see README or .env.example).",
-    };
+  const client = getClient();
+  if (!client) {
+    return { success: false, error: CONFIG_ERROR };
   }
 
-  const { data, error } = await supabase
+  const { data, error } = await client
     .from("tasks")
     .insert({
       title: input.title,
@@ -42,19 +47,30 @@ export async function createTask(
   return { success: true, task: data as Task };
 }
 
-export async function fetchPendingTasks(): Promise<Task[]> {
-  let supabase;
-  try {
-    supabase = getSupabaseServer();
-  } catch (e) {
-    console.error(
-      "fetchPendingTasks: Supabase not configured or client init failed:",
-      e
-    );
-    return [];
+export type DeleteTaskResult =
+  | { success: true }
+  | { success: false; error: string };
+
+export async function deleteTask(id: string): Promise<DeleteTaskResult> {
+  const client = getClient();
+  if (!client) {
+    return { success: false, error: CONFIG_ERROR };
   }
 
-  const { data, error } = await supabase
+  const { error } = await client.from("tasks").delete().eq("id", id);
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function fetchPendingTasks(): Promise<Task[]> {
+  const client = getClient();
+  if (!client) return [];
+
+  const { data, error } = await client
     .from("tasks")
     .select()
     .eq("status", "pending")
@@ -62,7 +78,6 @@ export async function fetchPendingTasks(): Promise<Task[]> {
     .order("created_at", { ascending: true });
 
   if (error) {
-    console.error("Failed to fetch tasks:", error.message);
     return [];
   }
 

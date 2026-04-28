@@ -1,0 +1,14 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "entry": ["app/**/*.{ts,tsx}"],
+  "project": ["**/*.{ts,tsx}", "!.next/**", "!node_modules/**"],
+  "ignoreDependencies": [
+    "shadcn",
+    "@biomejs/biome",
+    "tailwindcss",
+    "postcss",
+    "tw-animate-css"
+  ],
+  "ignoreExportsUsedInFile": true,
+  "ignore": ["components/ui/**"]
+}

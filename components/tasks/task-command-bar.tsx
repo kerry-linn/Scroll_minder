@@ -1,18 +1,18 @@
 "use client";
 
-import * as React from "react";
 import { format } from "date-fns";
 import { CalendarIcon, PlusIcon } from "lucide-react";
+import * as React from "react";
 import { toast } from "sonner";
-
+import { createTask } from "@/app/actions/tasks";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import {
   Select,
   SelectContent,
@@ -20,12 +20,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-import { useTasksStore } from "@/stores/tasks-store";
-import { createTask } from "@/app/actions/tasks";
-import type { TaskPriority } from "@/lib/tasks/types";
 import { formatDaysRemaining } from "@/lib/tasks/date-utils";
+import type { TaskPriority } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
+import { useTasksStore } from "@/stores/tasks-store";
 
 function generateTempId(): string {
   return `optimistic-${Date.now()}-${Math.random().toString(36).slice(2)}`;
