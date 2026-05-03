@@ -1,8 +1,9 @@
 "use client";
 
-import { CheckIcon, Trash2 } from "lucide-react";
+import { CheckIcon, Link2Icon, PaperclipIcon, Trash2 } from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { getPresignedDownloadUrl } from "@/app/actions/attachments";
 import { deleteTask } from "@/app/actions/tasks";
 import { formatDaysRemaining } from "@/lib/tasks/date-utils";
 import type { OptimisticTask, TaskPriority } from "@/lib/tasks/types";
@@ -23,6 +24,69 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
 
 /** Duration the user must hold before the long-press completes (ms). */
 const LONG_PRESS_MS = 600;
+
+/**
+ * Renders a small attachment chip below a task title.
+ * - Manual URLs open directly in a new tab.
+ * - Private S3 objects first obtain a short-lived signed GET URL via server action.
+ */
+function AttachmentLink({
+  task,
+}: {
+  task: OptimisticTask;
+}) {
+  const [loading, setLoading] = React.useState(false);
+
+  const label = task.attachment_name ?? "Attachment";
+  const isS3 = Boolean(task.attachment_s3_key);
+  const isUrl = Boolean(task.attachment_url);
+
+  if (!isS3 && !isUrl) return null;
+
+  async function handleOpen(e: React.MouseEvent) {
+    e.stopPropagation();
+
+    if (isUrl && task.attachment_url) {
+      window.open(task.attachment_url, "_blank", "noopener,noreferrer");
+      return;
+    }
+
+    if (isS3 && task.attachment_s3_key) {
+      if (task.isOptimistic) {
+        toast.error("Wait for the task to finish saving before opening.");
+        return;
+      }
+      setLoading(true);
+      const result = await getPresignedDownloadUrl(task.attachment_s3_key);
+      setLoading(false);
+      if (result.success) {
+        window.open(result.url, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error(`Could not open file: ${result.error}`);
+      }
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleOpen}
+      onPointerDown={(e) => e.stopPropagation()}
+      disabled={loading}
+      className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/70 underline-offset-2 hover:text-muted-foreground hover:underline disabled:opacity-50"
+      aria-label={`Open attachment: ${label}`}
+    >
+      {isS3 ? (
+        <PaperclipIcon className="size-3 shrink-0" />
+      ) : (
+        <Link2Icon className="size-3 shrink-0" />
+      )}
+      <span className="truncate max-w-[200px]">
+        {loading ? "Opening…" : label}
+      </span>
+    </button>
+  );
+}
 
 /** Group tasks by their ISO date string (YYYY-MM-DD) or "no-date". */
 function groupByDate(
@@ -123,9 +187,12 @@ function TaskCard({ task }: { task: OptimisticTask }) {
       onPointerLeave={cancelPress}
       onPointerCancel={cancelPress}
     >
-      <span className="truncate text-sm font-medium text-foreground">
-        {task.title}
-      </span>
+      <div className="flex min-w-0 flex-col">
+        <span className="truncate text-sm font-medium text-foreground">
+          {task.title}
+        </span>
+        <AttachmentLink task={task} />
+      </div>
 
       <div className="flex shrink-0 flex-col items-end gap-1">
         <span

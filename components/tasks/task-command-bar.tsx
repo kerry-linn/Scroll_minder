@@ -1,9 +1,16 @@
 "use client";
 
 import { format } from "date-fns";
-import { CalendarIcon, PlusIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  Link2Icon,
+  PaperclipIcon,
+  PlusIcon,
+  XIcon,
+} from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
+import { getPresignedUploadUrl } from "@/app/actions/attachments";
 import { createTask } from "@/app/actions/tasks";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -36,10 +43,34 @@ export function TaskCommandBar() {
   const [calOpen, setCalOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
+  // Attachment state — only one of (attachmentFile | attachmentUrl) is active
+  const [attachmentFile, setAttachmentFile] = React.useState<File | null>(null);
+  const [attachmentUrl, setAttachmentUrl] = React.useState("");
+  const [uploading, setUploading] = React.useState(false);
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
   const { addOptimisticTask, replaceOptimisticTask, removeTask } =
     useTasksStore();
 
   const daysLabel = dueDate ? formatDaysRemaining(dueDate.toISOString()) : null;
+
+  const hasAttachment = attachmentFile !== null || attachmentUrl.trim() !== "";
+
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] ?? null;
+    if (file) {
+      setAttachmentFile(file);
+      setAttachmentUrl(""); // mutually exclusive
+    }
+    // reset the input so the same file can be re-selected after clearing
+    e.target.value = "";
+  }
+
+  function clearAttachment() {
+    setAttachmentFile(null);
+    setAttachmentUrl("");
+  }
 
   async function handleSubmit() {
     const trimmed = title.trim();
@@ -52,6 +83,52 @@ export function TaskCommandBar() {
     const now = new Date().toISOString();
     const dueDateIso = dueDate ? dueDate.toISOString() : null;
 
+    // Resolve attachment fields before creating the optimistic task
+    let attachS3Key: string | null = null;
+    let attachUrl: string | null = null;
+    let attachName: string | null = null;
+
+    if (attachmentFile) {
+      setUploading(true);
+      const result = await getPresignedUploadUrl(
+        attachmentFile.name,
+        attachmentFile.type,
+        attachmentFile.size,
+      );
+      setUploading(false);
+
+      if (!result.success) {
+        toast.error(`Upload failed: ${result.error}`);
+        return;
+      }
+
+      // PUT the file bytes directly to S3 using the presigned URL
+      try {
+        const putRes = await fetch(result.signedUrl, {
+          method: "PUT",
+          headers: { "Content-Type": attachmentFile.type },
+          body: attachmentFile,
+        });
+        if (!putRes.ok) {
+          toast.error("Upload to S3 failed. Please try again.");
+          return;
+        }
+      } catch {
+        toast.error("Upload to S3 failed. Please check your connection.");
+        return;
+      }
+
+      attachS3Key = result.s3Key;
+      attachName = attachmentFile.name;
+    } else if (attachmentUrl.trim()) {
+      attachUrl = attachmentUrl.trim();
+      try {
+        attachName = new URL(attachUrl).hostname;
+      } catch {
+        attachName = attachUrl;
+      }
+    }
+
     addOptimisticTask({
       id: tempId,
       user_id: "",
@@ -61,17 +138,24 @@ export function TaskCommandBar() {
       status: "pending",
       created_at: now,
       isOptimistic: true,
+      attachment_url: attachUrl,
+      attachment_s3_key: attachS3Key,
+      attachment_name: attachName,
     });
 
     setTitle("");
     setDueDate(undefined);
     setPriority("low");
+    clearAttachment();
     setSubmitting(true);
 
     const result = await createTask({
       title: trimmed,
       due_date: dueDateIso,
       priority,
+      attachment_url: attachUrl,
+      attachment_s3_key: attachS3Key,
+      attachment_name: attachName,
     });
 
     setSubmitting(false);
@@ -85,77 +169,162 @@ export function TaskCommandBar() {
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter" && !submitting) {
+    if (e.key === "Enter" && !submitting && !uploading) {
       handleSubmit();
     }
   }
 
+  const busy = submitting || uploading;
+
   return (
     <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3 shadow-[0_-2px_12px_0_rgba(0,0,0,0.06)]">
-      <div className="mx-auto grid max-w-3xl grid-cols-[1fr_auto_auto_auto] items-center gap-2">
-        <Input
-          placeholder="New task…"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={handleKeyDown}
-          disabled={submitting}
-          className="h-9 text-sm"
-        />
+      <div className="mx-auto max-w-3xl space-y-2">
+        {/* Row 1 — main task fields */}
+        <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
+          <Input
+            placeholder="New task…"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={busy}
+            className="h-9 text-sm"
+          />
 
-        <Popover open={calOpen} onOpenChange={setCalOpen}>
-          <PopoverTrigger
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "h-9 w-auto gap-1.5 px-3 text-sm",
-              !dueDate && "text-muted-foreground"
-            )}
+          <Popover open={calOpen} onOpenChange={setCalOpen}>
+            <PopoverTrigger
+              className={cn(
+                buttonVariants({ variant: "outline", size: "sm" }),
+                "h-9 w-auto gap-1.5 px-3 text-sm",
+                !dueDate && "text-muted-foreground",
+              )}
+            >
+              <CalendarIcon className="size-3.5 shrink-0" />
+              {dueDate ? (
+                <span>
+                  {format(dueDate, "MMM d")}{" "}
+                  <span className="text-muted-foreground">· {daysLabel}</span>
+                </span>
+              ) : (
+                <span>Due date</span>
+              )}
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={dueDate}
+                onSelect={(d) => {
+                  setDueDate(d);
+                  setCalOpen(false);
+                }}
+                captionLayout="label"
+              />
+            </PopoverContent>
+          </Popover>
+
+          <Select
+            value={priority}
+            onValueChange={(v) => setPriority(v as TaskPriority)}
           >
-            <CalendarIcon className="size-3.5 shrink-0" />
-            {dueDate ? (
-              <span>
-                {format(dueDate, "MMM d")}{" "}
-                <span className="text-muted-foreground">· {daysLabel}</span>
+            <SelectTrigger className="h-9 w-24 text-sm">
+              <SelectValue placeholder="Priority" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="low">Low</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Button
+            size="sm"
+            className="h-9 gap-1.5 px-3"
+            onClick={handleSubmit}
+            disabled={busy}
+          >
+            <PlusIcon className="size-3.5" />
+            {uploading ? "Uploading…" : "Add"}
+          </Button>
+        </div>
+
+        {/* Row 2 — optional attachment */}
+        <div className="flex items-center gap-2">
+          {/* Hidden native file picker */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            accept={[
+              "image/*",
+              "application/pdf",
+              "text/plain",
+              "text/csv",
+              "application/zip",
+              "application/msword",
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+              "application/vnd.ms-excel",
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            ].join(",")}
+            onChange={handleFileChange}
+          />
+
+          {hasAttachment ? (
+            /* Pill showing the active attachment */
+            <div className="flex flex-1 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+              {attachmentFile ? (
+                <PaperclipIcon className="size-3 shrink-0" />
+              ) : (
+                <Link2Icon className="size-3 shrink-0" />
+              )}
+              <span className="truncate">
+                {attachmentFile ? attachmentFile.name : attachmentUrl}
               </span>
-            ) : (
-              <span>Due date</span>
-            )}
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={dueDate}
-              onSelect={(d) => {
-                setDueDate(d);
-                setCalOpen(false);
-              }}
-              captionLayout="label"
-            />
-          </PopoverContent>
-        </Popover>
+              <button
+                type="button"
+                onClick={clearAttachment}
+                className="ml-auto shrink-0 rounded p-0.5 hover:text-foreground"
+                aria-label="Remove attachment"
+              >
+                <XIcon className="size-3" />
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* URL paste input */}
+              <div className="relative flex flex-1 items-center">
+                <Link2Icon className="absolute left-2.5 size-3.5 shrink-0 text-muted-foreground" />
+                <Input
+                  placeholder="Paste a link (optional)"
+                  value={attachmentUrl}
+                  onChange={(e) => {
+                    setAttachmentUrl(e.target.value);
+                    if (e.target.value) setAttachmentFile(null);
+                  }}
+                  disabled={busy}
+                  className="h-8 pl-8 text-xs text-muted-foreground placeholder:text-muted-foreground/60"
+                />
+              </div>
 
-        <Select
-          value={priority}
-          onValueChange={(v) => setPriority(v as TaskPriority)}
-        >
-          <SelectTrigger className="h-9 w-24 text-sm">
-            <SelectValue placeholder="Priority" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="high">High</SelectItem>
-            <SelectItem value="medium">Medium</SelectItem>
-            <SelectItem value="low">Low</SelectItem>
-          </SelectContent>
-        </Select>
+              {/* Divider */}
+              <span className="shrink-0 text-xs text-muted-foreground/50">
+                or
+              </span>
 
-        <Button
-          size="sm"
-          className="h-9 gap-1.5 px-3"
-          onClick={handleSubmit}
-          disabled={submitting}
-        >
-          <PlusIcon className="size-3.5" />
-          Add
-        </Button>
+              {/* File upload button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={busy}
+                className={cn(
+                  buttonVariants({ variant: "outline", size: "sm" }),
+                  "h-8 gap-1.5 px-2.5 text-xs text-muted-foreground",
+                )}
+              >
+                <PaperclipIcon className="size-3.5" />
+                Upload file
+              </button>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -5,6 +5,10 @@ import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
 const PUBLIC_PATHS = ["/login", "/register"];
 
 export async function proxy(request: NextRequest) {
+  if (request.nextUrl.pathname.startsWith("/api/cron")) {
+    return NextResponse.next();
+  }
+
   const response = NextResponse.next({ request });
   const supabase = createSupabaseMiddlewareClient(request, response);
 

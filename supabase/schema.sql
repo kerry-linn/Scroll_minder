@@ -98,3 +98,10 @@ grant select, insert on table task_email_reminders to service_role;
 -- drop index if exists tasks_due_date_idx;
 -- create index tasks_user_due_date_idx
 --   on tasks (user_id, due_date asc nulls last, created_at asc);
+
+-- ============================================================
+-- Migration: S3 attachment support (run in Supabase SQL editor)
+-- attachment_url was already added separately; run the two below.
+-- ============================================================
+-- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS attachment_s3_key TEXT;
+-- ALTER TABLE tasks ADD COLUMN IF NOT EXISTS attachment_name TEXT;

@@ -1,16 +1,40 @@
 import { create } from "zustand";
-import type { OptimisticTask, Task } from "@/lib/tasks/types";
+import type { OptimisticTask, Task, TaskPriority } from "@/lib/tasks/types";
 
-function sortByDueDateThenCreated(tasks: OptimisticTask[]): OptimisticTask[] {
+const PRIORITY_RANK: Record<TaskPriority, number> = {
+  high: 0,
+  medium: 1,
+  low: 2,
+};
+
+function dueDateKey(task: OptimisticTask): string | null {
+  return task.due_date ? task.due_date.slice(0, 10) : null;
+}
+
+function sortByDueDatePriorityThenCreated(
+  tasks: OptimisticTask[]
+): OptimisticTask[] {
   return [...tasks].sort((a, b) => {
-    // Null due_date sorts after all dated tasks
-    if (!a.due_date && !b.due_date) {
+    const aDate = dueDateKey(a);
+    const bDate = dueDateKey(b);
+
+    // Null due_date sorts after all dated tasks.
+    if (!aDate && !bDate) {
+      const priorityDiff =
+        PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+      if (priorityDiff !== 0) return priorityDiff;
       return a.created_at.localeCompare(b.created_at);
     }
-    if (!a.due_date) return 1;
-    if (!b.due_date) return -1;
-    const diff = a.due_date.localeCompare(b.due_date);
-    return diff !== 0 ? diff : a.created_at.localeCompare(b.created_at);
+    if (!aDate) return 1;
+    if (!bDate) return -1;
+
+    const dateDiff = aDate.localeCompare(bDate);
+    if (dateDiff !== 0) return dateDiff;
+
+    const priorityDiff = PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];
+    return priorityDiff !== 0
+      ? priorityDiff
+      : a.created_at.localeCompare(b.created_at);
   });
 }
 
@@ -26,16 +50,18 @@ export const useTasksStore = create<TasksState>((set) => ({
   tasks: [],
 
   setTasks: (tasks) =>
-    set({ tasks: sortByDueDateThenCreated(tasks.map((t) => ({ ...t }))) }),
+    set({
+      tasks: sortByDueDatePriorityThenCreated(tasks.map((t) => ({ ...t }))),
+    }),
 
   addOptimisticTask: (task) =>
     set((state) => ({
-      tasks: sortByDueDateThenCreated([...state.tasks, task]),
+      tasks: sortByDueDatePriorityThenCreated([...state.tasks, task]),
     })),
 
   replaceOptimisticTask: (tempId, persistedTask) =>
     set((state) => ({
-      tasks: sortByDueDateThenCreated(
+      tasks: sortByDueDatePriorityThenCreated(
         state.tasks.map((t) =>
           t.id === tempId ? { ...persistedTask, isOptimistic: false } : t
         )

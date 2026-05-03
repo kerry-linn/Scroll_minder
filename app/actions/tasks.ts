@@ -31,6 +31,9 @@ export async function createTask(
       due_date: input.due_date,
       priority: input.priority,
       status: "pending",
+      attachment_url: input.attachment_url ?? null,
+      attachment_s3_key: input.attachment_s3_key ?? null,
+      attachment_name: input.attachment_name ?? null,
     })
     .select()
     .single();
