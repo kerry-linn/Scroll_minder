@@ -18,7 +18,6 @@ function sortByDueDatePriorityThenCreated(
     const aDate = dueDateKey(a);
     const bDate = dueDateKey(b);
 
-    // Null due_date sorts after all dated tasks.
     if (!aDate && !bDate) {
       const priorityDiff =
         PRIORITY_RANK[a.priority] - PRIORITY_RANK[b.priority];

@@ -43,7 +43,6 @@ export function TaskCommandBar() {
   const [calOpen, setCalOpen] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
 
-  // Attachment state — only one of (attachmentFile | attachmentUrl) is active
   const [attachmentFile, setAttachmentFile] = React.useState<File | null>(null);
   const [attachmentUrl, setAttachmentUrl] = React.useState("");
   const [uploading, setUploading] = React.useState(false);
@@ -61,9 +60,8 @@ export function TaskCommandBar() {
     const file = e.target.files?.[0] ?? null;
     if (file) {
       setAttachmentFile(file);
-      setAttachmentUrl(""); // mutually exclusive
+      setAttachmentUrl("");
     }
-    // reset the input so the same file can be re-selected after clearing
     e.target.value = "";
   }
 
@@ -83,7 +81,6 @@ export function TaskCommandBar() {
     const now = new Date().toISOString();
     const dueDateIso = dueDate ? dueDate.toISOString() : null;
 
-    // Resolve attachment fields before creating the optimistic task
     let attachS3Key: string | null = null;
     let attachUrl: string | null = null;
     let attachName: string | null = null;
@@ -93,7 +90,7 @@ export function TaskCommandBar() {
       const result = await getPresignedUploadUrl(
         attachmentFile.name,
         attachmentFile.type,
-        attachmentFile.size,
+        attachmentFile.size
       );
       setUploading(false);
 
@@ -102,7 +99,6 @@ export function TaskCommandBar() {
         return;
       }
 
-      // PUT the file bytes directly to S3 using the presigned URL
       try {
         const putRes = await fetch(result.signedUrl, {
           method: "PUT",
@@ -179,7 +175,6 @@ export function TaskCommandBar() {
   return (
     <div className="sticky bottom-0 z-10 border-t border-border bg-background px-4 py-3 shadow-[0_-2px_12px_0_rgba(0,0,0,0.06)]">
       <div className="mx-auto max-w-3xl space-y-2">
-        {/* Row 1 — main task fields */}
         <div className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-2">
           <Input
             placeholder="New task…"
@@ -195,7 +190,7 @@ export function TaskCommandBar() {
               className={cn(
                 buttonVariants({ variant: "outline", size: "sm" }),
                 "h-9 w-auto gap-1.5 px-3 text-sm",
-                !dueDate && "text-muted-foreground",
+                !dueDate && "text-muted-foreground"
               )}
             >
               <CalendarIcon className="size-3.5 shrink-0" />
@@ -246,9 +241,7 @@ export function TaskCommandBar() {
           </Button>
         </div>
 
-        {/* Row 2 — optional attachment */}
         <div className="flex items-center gap-2">
-          {/* Hidden native file picker */}
           <input
             ref={fileInputRef}
             type="file"
@@ -268,7 +261,6 @@ export function TaskCommandBar() {
           />
 
           {hasAttachment ? (
-            /* Pill showing the active attachment */
             <div className="flex flex-1 items-center gap-1.5 rounded-md border border-border bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
               {attachmentFile ? (
                 <PaperclipIcon className="size-3 shrink-0" />
@@ -289,7 +281,6 @@ export function TaskCommandBar() {
             </div>
           ) : (
             <>
-              {/* URL paste input */}
               <div className="relative flex flex-1 items-center">
                 <Link2Icon className="absolute left-2.5 size-3.5 shrink-0 text-muted-foreground" />
                 <Input
@@ -304,19 +295,17 @@ export function TaskCommandBar() {
                 />
               </div>
 
-              {/* Divider */}
               <span className="shrink-0 text-xs text-muted-foreground/50">
                 or
               </span>
 
-              {/* File upload button */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={busy}
                 className={cn(
                   buttonVariants({ variant: "outline", size: "sm" }),
-                  "h-8 gap-1.5 px-2.5 text-xs text-muted-foreground",
+                  "h-8 gap-1.5 px-2.5 text-xs text-muted-foreground"
                 )}
               >
                 <PaperclipIcon className="size-3.5" />

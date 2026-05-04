@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CreateTaskInput, Task } from "@/lib/tasks/types";
+import { deleteS3Object } from "./attachments";
 
 export type CreateTaskResult =
   | { success: true; task: Task }
@@ -58,6 +59,13 @@ export async function deleteTask(id: string): Promise<DeleteTaskResult> {
     return { success: false, error: "Session expired. Please sign in again." };
   }
 
+  const { data: task } = await supabase
+    .from("tasks")
+    .select("attachment_s3_key")
+    .eq("id", id)
+    .eq("user_id", user.id)
+    .single();
+
   const { error } = await supabase
     .from("tasks")
     .delete()
@@ -66,6 +74,10 @@ export async function deleteTask(id: string): Promise<DeleteTaskResult> {
 
   if (error) {
     return { success: false, error: error.message };
+  }
+
+  if (task?.attachment_s3_key) {
+    await deleteS3Object(task.attachment_s3_key);
   }
 
   return { success: true };

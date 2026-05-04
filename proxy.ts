@@ -12,7 +12,6 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
   const supabase = createSupabaseMiddlewareClient(request, response);
 
-  // Refresh the session so tokens are rotated on every request.
   const {
     data: { user },
   } = await supabase.auth.getUser();

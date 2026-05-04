@@ -9,11 +9,8 @@ export interface Task {
   priority: TaskPriority;
   status: TaskStatus;
   created_at: string;
-  /** Manually pasted external link. */
   attachment_url: string | null;
-  /** S3 object key for private uploads (use to generate signed GET URLs). */
   attachment_s3_key: string | null;
-  /** Human-readable label shown under the task title. */
   attachment_name: string | null;
 }
 
@@ -27,6 +24,5 @@ export interface CreateTaskInput {
 }
 
 export interface OptimisticTask extends Task {
-  /** true while the row has not yet been confirmed by Supabase */
   isOptimistic?: boolean;
 }

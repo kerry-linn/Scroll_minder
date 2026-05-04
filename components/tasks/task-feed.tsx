@@ -22,19 +22,9 @@ const PRIORITY_COLOR: Record<TaskPriority, string> = {
   low: "text-muted-foreground",
 };
 
-/** Duration the user must hold before the long-press completes (ms). */
 const LONG_PRESS_MS = 600;
 
-/**
- * Renders a small attachment chip below a task title.
- * - Manual URLs open directly in a new tab.
- * - Private S3 objects first obtain a short-lived signed GET URL via server action.
- */
-function AttachmentLink({
-  task,
-}: {
-  task: OptimisticTask;
-}) {
+function AttachmentLink({ task }: { task: OptimisticTask }) {
   const [loading, setLoading] = React.useState(false);
 
   const label = task.attachment_name ?? "Attachment";
@@ -88,16 +78,13 @@ function AttachmentLink({
   );
 }
 
-/** Group tasks by their ISO date string (YYYY-MM-DD) or "no-date". */
 function groupByDate(
   tasks: OptimisticTask[]
 ): { key: string; label: string; tasks: OptimisticTask[] }[] {
   const map = new Map<string, OptimisticTask[]>();
 
   for (const task of tasks) {
-    const key = task.due_date
-      ? task.due_date.slice(0, 10) // "YYYY-MM-DD"
-      : "no-date";
+    const key = task.due_date ? task.due_date.slice(0, 10) : "no-date";
     const bucket = map.get(key) ?? [];
     bucket.push(task);
     map.set(key, bucket);
@@ -108,7 +95,7 @@ function groupByDate(
     if (key === "no-date") {
       label = "No date";
     } else {
-      const date = new Date(`${key}T12:00:00`); // noon avoids TZ shifts
+      const date = new Date(`${key}T12:00:00`);
       label = date.toLocaleDateString(undefined, {
         weekday: "short",
         month: "short",
@@ -121,13 +108,11 @@ function groupByDate(
 
 function TaskCard({ task }: { task: OptimisticTask }) {
   const { removeTask, addOptimisticTask } = useTasksStore();
-  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
   const [pressing, setPressing] = React.useState(false);
 
-  /**
-   * Shared removal logic used by both the trash icon, the green check,
-   * and the long-press gesture. Identical behavior per the spec.
-   */
   async function removeWithRollback(label: string) {
     removeTask(task.id);
 
@@ -149,9 +134,8 @@ function TaskCard({ task }: { task: OptimisticTask }) {
     removeWithRollback("Couldn't complete task");
   }
 
-  // Long-press handlers
   function startPress() {
-    if (task.isOptimistic) return; // don't trigger on unconfirmed rows
+    if (task.isOptimistic) return;
     setPressing(true);
     longPressTimer.current = setTimeout(() => {
       setPressing(false);
@@ -168,7 +152,6 @@ function TaskCard({ task }: { task: OptimisticTask }) {
     setPressing(false);
   }
 
-  // Cleanup on unmount
   React.useEffect(() => {
     return () => {
       if (longPressTimer.current) clearTimeout(longPressTimer.current);
@@ -201,21 +184,19 @@ function TaskCard({ task }: { task: OptimisticTask }) {
           {PRIORITY_LABEL[task.priority]}
         </span>
         <div className="flex items-center gap-1.5">
-          {/* Complete (green check) */}
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation();
               handleComplete();
             }}
-            onPointerDown={(e) => e.stopPropagation()} // prevent long-press from firing too
+            onPointerDown={(e) => e.stopPropagation()}
             className="cursor-pointer text-muted-foreground/40 transition-colors hover:text-green-500"
             aria-label={`Complete "${task.title}"`}
           >
             <CheckIcon className="size-3" />
           </button>
 
-          {/* Delete (red trash) */}
           <button
             type="button"
             onClick={(e) => {

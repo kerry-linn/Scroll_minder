@@ -17,9 +17,7 @@ interface PendingTask {
   priority: TaskPriority;
 }
 
-function buildWindowFilter(
-  daysAhead: number,
-): { gte: string; lt: string } {
+function buildWindowFilter(daysAhead: number): { gte: string; lt: string } {
   const targetDay = startOfDay(addDays(new Date(), daysAhead));
   const nextDay = addDays(targetDay, 1);
   return {
@@ -46,7 +44,7 @@ function formatDueDate(isoDate: string): string {
 
 async function getUserEmail(
   supabase: ReturnType<typeof createSupabaseAdminClient>,
-  userId: string,
+  userId: string
 ): Promise<string | null> {
   const { data, error } = await supabase.auth.admin.getUserById(userId);
   if (error || !data.user?.email) return null;
@@ -56,7 +54,10 @@ async function getUserEmail(
 export async function GET(request: Request) {
   const cronSecret = process.env.REMINDER_CRON_SECRET;
   if (!cronSecret) {
-    return Response.json({ error: "REMINDER_CRON_SECRET not configured." }, { status: 500 });
+    return Response.json(
+      { error: "REMINDER_CRON_SECRET not configured." },
+      { status: 500 }
+    );
   }
 
   const authHeader = request.headers.get("authorization");
@@ -66,10 +67,10 @@ export async function GET(request: Request) {
     return Response.json({ error: "Unauthorized." }, { status: 401 });
   }
 
-  const fromEmail = process.env.REMINDER_FROM_EMAIL ?? "reminders@scrollminder.app";
+  const fromEmail =
+    process.env.REMINDER_FROM_EMAIL ?? "reminders@scrollminder.app";
   const supabase = createSupabaseAdminClient();
 
-  // Fetch tasks due in 3 days (low/medium) and 5 days (high) separately
   const windows: { days: number; priorities: TaskPriority[] }[] = [
     { days: 3, priorities: ["low", "medium"] },
     { days: 5, priorities: ["high"] },
@@ -91,7 +92,9 @@ export async function GET(request: Request) {
       .lt("due_date", lt);
 
     if (fetchError) {
-      errors.push(`Failed to fetch tasks for ${days}d window: ${fetchError.message}`);
+      errors.push(
+        `Failed to fetch tasks for ${days}d window: ${fetchError.message}`
+      );
       continue;
     }
 
@@ -100,7 +103,6 @@ export async function GET(request: Request) {
     for (const task of tasks as PendingTask[]) {
       const reminderType = reminderTypeForPriority(task.priority);
 
-      // Check dedupe: skip if already sent this reminder for this task
       const { data: existing } = await supabase
         .from("task_email_reminders")
         .select("id")
@@ -115,13 +117,16 @@ export async function GET(request: Request) {
 
       const email = await getUserEmail(supabase, task.user_id);
       if (!email) {
-        errors.push(`Could not resolve email for user ${task.user_id} (task ${task.id})`);
+        errors.push(
+          `Could not resolve email for user ${task.user_id} (task ${task.id})`
+        );
         continue;
       }
 
       const dueDays = daysAheadForPriority(task.priority);
       const formattedDate = formatDueDate(task.due_date);
-      const priorityLabel = task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
+      const priorityLabel =
+        task.priority.charAt(0).toUpperCase() + task.priority.slice(1);
 
       const { error: sendError } = await resend.emails.send({
         from: fromEmail,
@@ -147,11 +152,12 @@ export async function GET(request: Request) {
       });
 
       if (sendError) {
-        errors.push(`Failed to send email for task ${task.id}: ${sendError.message}`);
+        errors.push(
+          `Failed to send email for task ${task.id}: ${sendError.message}`
+        );
         continue;
       }
 
-      // Record dedupe entry so this task+threshold is not emailed again
       await supabase
         .from("task_email_reminders")
         .insert({ task_id: task.id, reminder_type: reminderType });

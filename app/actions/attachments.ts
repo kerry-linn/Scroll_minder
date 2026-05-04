@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -39,7 +40,7 @@ const ALLOWED_TYPES = new Set([
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
 ]);
 
-const MAX_BYTES = 20 * 1024 * 1024; // 20 MB
+const MAX_BYTES = 20 * 1024 * 1024;
 
 type UploadUrlResult =
   | { success: true; signedUrl: string; s3Key: string }
@@ -49,17 +50,10 @@ type DownloadUrlResult =
   | { success: true; url: string }
   | { success: false; error: string };
 
-/**
- * Returns a short-lived presigned PUT URL so the browser can upload
- * a file directly to S3 without exposing credentials.
- *
- * The caller should PUT the file bytes to `signedUrl` with the
- * matching Content-Type header, then pass `s3Key` to createTask.
- */
 export async function getPresignedUploadUrl(
   fileName: string,
   fileType: string,
-  fileSize: number,
+  fileSize: number
 ): Promise<UploadUrlResult> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -72,7 +66,6 @@ export async function getPresignedUploadUrl(
   if (fileSize > MAX_BYTES)
     return { success: false, error: "File too large (max 20 MB)." };
 
-  // Scope each object under the user's own prefix to enforce download ownership checks.
   const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const s3Key = `${user.id}/${crypto.randomUUID()}-${safeFileName}`;
 
@@ -83,7 +76,6 @@ export async function getPresignedUploadUrl(
   });
 
   try {
-    // 5-minute window to complete the browser-side PUT
     const signedUrl = await getSignedUrl(s3, command, { expiresIn: 300 });
     return { success: true, signedUrl, s3Key };
   } catch {
@@ -91,12 +83,8 @@ export async function getPresignedUploadUrl(
   }
 }
 
-/**
- * Returns a short-lived presigned GET URL so the browser can download
- * a private S3 object. Enforces that the key belongs to the calling user.
- */
 export async function getPresignedDownloadUrl(
-  s3Key: string,
+  s3Key: string
 ): Promise<DownloadUrlResult> {
   const supabase = await createSupabaseServerClient();
   const {
@@ -110,10 +98,17 @@ export async function getPresignedDownloadUrl(
   const command = new GetObjectCommand({ Bucket: BUCKET, Key: s3Key });
 
   try {
-    // 15-minute window to view the file after clicking the link
     const url = await getSignedUrl(s3, command, { expiresIn: 900 });
     return { success: true, url };
   } catch {
     return { success: false, error: "Failed to generate download URL." };
+  }
+}
+
+export async function deleteS3Object(s3Key: string): Promise<void> {
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: s3Key }));
+  } catch {
+    // best effort — task row is already gone
   }
 }

@@ -32,8 +32,7 @@ export async function createSupabaseServerClient() {
             cookieStore.set(name, value, options);
           }
         } catch {
-          // Server Components cannot set cookies; ignore.
-          // The middleware client refreshes the session instead.
+          // intentionally empty: Server Components can't set cookies
         }
       },
     },
