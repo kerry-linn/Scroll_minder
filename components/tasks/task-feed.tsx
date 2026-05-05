@@ -46,13 +46,32 @@ function AttachmentLink({ task }: { task: OptimisticTask }) {
         toast.error("Wait for the task to finish saving before opening.");
         return;
       }
+
+      // Open a blank tab synchronously while the browser still trusts the
+      // click gesture. Assigning its location after the await avoids the
+      // async popup blocker in Chrome and Safari.
+      const newTab = window.open("about:blank", "_blank");
+      if (!newTab) {
+        toast.error(
+          "Pop-up blocked. Please allow pop-ups for this site and try again."
+        );
+        return;
+      }
+
       setLoading(true);
-      const result = await getPresignedDownloadUrl(task.attachment_s3_key);
-      setLoading(false);
-      if (result.success) {
-        window.open(result.url, "_blank", "noopener,noreferrer");
-      } else {
-        toast.error(`Could not open file: ${result.error}`);
+      try {
+        const result = await getPresignedDownloadUrl(task.attachment_s3_key);
+        if (result.success) {
+          newTab.location.href = result.url;
+        } else {
+          newTab.close();
+          toast.error(`Could not open file: ${result.error}`);
+        }
+      } catch {
+        newTab.close();
+        toast.error("Something went wrong opening the attachment.");
+      } finally {
+        setLoading(false);
       }
     }
   }
