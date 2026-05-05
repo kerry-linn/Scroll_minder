@@ -60,16 +60,29 @@ function AttachmentLink({ task }: { task: OptimisticTask }) {
 
       setLoading(true);
       try {
-        const result = await getPresignedDownloadUrl(task.attachment_s3_key);
+        // Race against an 8-second timeout so the UI never stays stuck if the
+        // server action hangs (e.g. cold-start crash with no HTTP response).
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(
+            () => reject(new Error("Request timed out. Please try again.")),
+            8_000
+          )
+        );
+        const result = await Promise.race([
+          getPresignedDownloadUrl(task.attachment_s3_key),
+          timeout,
+        ]);
         if (result.success) {
           newTab.location.href = result.url;
         } else {
           newTab.close();
           toast.error(`Could not open file: ${result.error}`);
         }
-      } catch {
+      } catch (err) {
         newTab.close();
-        toast.error("Something went wrong opening the attachment.");
+        const msg =
+          err instanceof Error ? err.message : "Something went wrong.";
+        toast.error(`Could not open file: ${msg}`);
       } finally {
         setLoading(false);
       }
