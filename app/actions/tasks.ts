@@ -1,5 +1,7 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
+import { checkTaskCreationLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { CreateTaskInput, Task } from "@/lib/tasks/types";
 import { deleteS3Object } from "./attachments";
@@ -24,6 +26,20 @@ export async function createTask(
     return { success: false, error: "Session expired. Please sign in again." };
   }
 
+  try {
+    const limit = await checkTaskCreationLimit(user.id);
+    if (!limit.allowed) {
+      const retrySeconds = Math.ceil(limit.retryAfterMs / 1000);
+      return {
+        success: false,
+        error: `You're creating tasks too quickly. Please wait ${retrySeconds} second${retrySeconds === 1 ? "" : "s"} and try again.`,
+      };
+    }
+  } catch (err) {
+    // Rate-limit check failure should not block task creation — log and continue.
+    Sentry.captureException(err, { tags: { source: "rate-limit" } });
+  }
+
   const { data, error } = await supabase
     .from("tasks")
     .insert({
@@ -40,6 +56,13 @@ export async function createTask(
     .single();
 
   if (error || !data) {
+    Sentry.captureException(
+      error ?? new Error("createTask: no data returned"),
+      {
+        tags: { source: "createTask" },
+        user: { id: user.id },
+      }
+    );
     return {
       success: false,
       error: error?.message ?? "Unknown error inserting task.",
@@ -73,6 +96,11 @@ export async function deleteTask(id: string): Promise<DeleteTaskResult> {
     .eq("user_id", user.id);
 
   if (error) {
+    Sentry.captureException(error, {
+      tags: { source: "deleteTask" },
+      user: { id: user.id },
+      extra: { taskId: id },
+    });
     return { success: false, error: error.message };
   }
 
@@ -100,6 +128,10 @@ export async function fetchPendingTasks(): Promise<Task[]> {
     .order("created_at", { ascending: true });
 
   if (error) {
+    Sentry.captureException(error, {
+      tags: { source: "fetchPendingTasks" },
+      user: { id: user.id },
+    });
     return [];
   }
 

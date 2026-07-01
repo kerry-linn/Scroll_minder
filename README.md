@@ -143,6 +143,9 @@ The cron route at `/api/cron/due-reminders` sends one reminder email per task pe
 | `format` | `biome format --write .` | Auto-format all files |
 | `check` | `biome check .` | Lint + format check combined |
 | `typecheck` | `tsc --noEmit` | TypeScript type check |
+| `test` | `vitest run` | Run unit/integration tests |
+| `test:watch` | `vitest` | Watch mode for tests |
+| `test:coverage` | `vitest run --coverage` | Test coverage report |
 | `knip` | `knip` | Find unused exports and dependencies |
 
 ---

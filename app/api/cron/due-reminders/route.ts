@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { addDays, startOfDay } from "date-fns";
 import { Resend } from "resend";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -92,6 +93,9 @@ export async function GET(request: Request) {
       .lt("due_date", lt);
 
     if (fetchError) {
+      Sentry.captureException(fetchError, {
+        tags: { source: "cron:due-reminders", window: `${days}d` },
+      });
       errors.push(
         `Failed to fetch tasks for ${days}d window: ${fetchError.message}`
       );
@@ -152,6 +156,10 @@ export async function GET(request: Request) {
       });
 
       if (sendError) {
+        Sentry.captureException(sendError, {
+          tags: { source: "cron:due-reminders:resend" },
+          extra: { taskId: task.id, userId: task.user_id },
+        });
         errors.push(
           `Failed to send email for task ${task.id}: ${sendError.message}`
         );

@@ -7,6 +7,11 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import * as Sentry from "@sentry/nextjs";
+import {
+  validateS3KeyOwnership,
+  validateUpload,
+} from "@/lib/attachments/validation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 // Lazy initialization: build the client inside each function so that a missing
@@ -41,23 +46,6 @@ function createS3Client(): { client: S3Client; bucket: string } | null {
   };
 }
 
-const ALLOWED_TYPES = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-  "application/pdf",
-  "text/plain",
-  "text/csv",
-  "application/zip",
-  "application/msword",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.ms-excel",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-]);
-
-const MAX_BYTES = 20 * 1024 * 1024;
-
 type UploadUrlResult =
   | { success: true; signedUrl: string; s3Key: string }
   | { success: false; error: string };
@@ -80,10 +68,8 @@ export async function getPresignedUploadUrl(
   } = await supabase.auth.getUser();
 
   if (!user) return { success: false, error: "Not authenticated." };
-  if (!ALLOWED_TYPES.has(fileType))
-    return { success: false, error: "File type not allowed." };
-  if (fileSize > MAX_BYTES)
-    return { success: false, error: "File too large (max 20 MB)." };
+  const uploadCheck = validateUpload(fileType, fileSize);
+  if (!uploadCheck.valid) return { success: false, error: uploadCheck.error };
 
   const safeFileName = fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
   const s3Key = `${user.id}/${crypto.randomUUID()}-${safeFileName}`;
@@ -100,6 +86,7 @@ export async function getPresignedUploadUrl(
     });
     return { success: true, signedUrl, s3Key };
   } catch (err) {
+    Sentry.captureException(err, { tags: { source: "getPresignedUploadUrl" } });
     // biome-ignore lint/suspicious/noConsole: intentional server-side error logging for Vercel diagnostics
     console.error("[getPresignedUploadUrl] getSignedUrl failed:", err);
     return { success: false, error: "Failed to generate upload URL." };
@@ -118,12 +105,13 @@ export async function getPresignedDownloadUrl(
   } = await supabase.auth.getUser();
 
   if (!user) return { success: false, error: "Not authenticated." };
-  if (!s3Key.startsWith(`${user.id}/`)) {
+  const ownershipCheck = validateS3KeyOwnership(s3Key, user.id);
+  if (!ownershipCheck.valid) {
     // biome-ignore lint/suspicious/noConsole: intentional server-side error logging for Vercel diagnostics
     console.error(
       `[getPresignedDownloadUrl] Access denied: key="${s3Key}" userId="${user.id}"`
     );
-    return { success: false, error: "Access denied." };
+    return { success: false, error: ownershipCheck.error };
   }
 
   const command = new GetObjectCommand({ Bucket: aws.bucket, Key: s3Key });
@@ -132,6 +120,9 @@ export async function getPresignedDownloadUrl(
     const url = await getSignedUrl(aws.client, command, { expiresIn: 900 });
     return { success: true, url };
   } catch (err) {
+    Sentry.captureException(err, {
+      tags: { source: "getPresignedDownloadUrl" },
+    });
     // biome-ignore lint/suspicious/noConsole: intentional server-side error logging for Vercel diagnostics
     console.error("[getPresignedDownloadUrl] getSignedUrl failed:", err);
     return { success: false, error: "Failed to generate download URL." };
@@ -142,7 +133,9 @@ export async function deleteS3Object(s3Key: string): Promise<void> {
   const aws = createS3Client();
   if (!aws) return;
   try {
-    await aws.client.send(new DeleteObjectCommand({ Bucket: aws.bucket, Key: s3Key }));
+    await aws.client.send(
+      new DeleteObjectCommand({ Bucket: aws.bucket, Key: s3Key })
+    );
   } catch {
     // best effort — task row is already gone
   }

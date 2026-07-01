@@ -25,6 +25,7 @@ create index if not exists tasks_user_due_date_idx
 
 grant usage on schema public to authenticated;
 grant select, insert, update, delete on table tasks to authenticated;
+grant select on table tasks to service_role;
 
 alter table tasks enable row level security;
 

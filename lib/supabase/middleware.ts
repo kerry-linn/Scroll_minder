@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import type { NextRequest, NextResponse } from "next/server";
+import type { Database } from "./database.types";
 
 export function createSupabaseMiddlewareClient(
   request: NextRequest,
@@ -19,7 +20,7 @@ export function createSupabaseMiddlewareClient(
       );
     })();
 
-  return createServerClient(url, key, {
+  return createServerClient<Database>(url, key, {
     cookies: {
       getAll() {
         return request.cookies.getAll();
