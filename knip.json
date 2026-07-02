@@ -9,5 +9,5 @@
     "tw-animate-css"
   ],
   "ignoreExportsUsedInFile": true,
-  "ignore": ["components/ui/**"]
+  "ignore": ["components/ui/**", "lib/supabase/database.types.ts"]
 }

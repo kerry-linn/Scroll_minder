@@ -2,6 +2,7 @@ import type { TaskRow } from "@/lib/supabase/database.types";
 
 // Re-export generated DB enum types so callers don't need to reach into database.types directly.
 export type {
+  TaskAttachmentScanStatus,
   TaskPriority,
   TaskStatus,
 } from "@/lib/supabase/database.types";

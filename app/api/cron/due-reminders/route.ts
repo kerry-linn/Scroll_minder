@@ -6,7 +6,11 @@ import type { TaskPriority } from "@/lib/tasks/types";
 
 export const runtime = "nodejs";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend(): Resend {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) throw new Error("RESEND_API_KEY is not set.");
+  return new Resend(key);
+}
 
 type ReminderType = "due_3d" | "due_5d";
 
@@ -70,6 +74,7 @@ export async function GET(request: Request) {
 
   const fromEmail =
     process.env.REMINDER_FROM_EMAIL ?? "reminders@scrollminder.app";
+  const resend = getResend();
   const supabase = createSupabaseAdminClient();
 
   const windows: { days: number; priorities: TaskPriority[] }[] = [

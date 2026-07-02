@@ -5,7 +5,11 @@ import { createSupabaseMiddlewareClient } from "@/lib/supabase/middleware";
 const PUBLIC_PATHS = ["/login", "/register"];
 
 export async function proxy(request: NextRequest) {
-  if (request.nextUrl.pathname.startsWith("/api/cron")) {
+  // These routes authenticate themselves via Bearer token — skip session middleware.
+  if (
+    request.nextUrl.pathname.startsWith("/api/cron") ||
+    request.nextUrl.pathname.startsWith("/api/attachments/scan-callback")
+  ) {
     return NextResponse.next();
   }
 

@@ -3,7 +3,11 @@
 import * as Sentry from "@sentry/nextjs";
 import { checkTaskCreationLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { CreateTaskInput, Task } from "@/lib/tasks/types";
+import type {
+  CreateTaskInput,
+  Task,
+  TaskAttachmentScanStatus,
+} from "@/lib/tasks/types";
 import { deleteS3Object } from "./attachments";
 
 export type CreateTaskResult =
@@ -40,6 +44,10 @@ export async function createTask(
     Sentry.captureException(err, { tags: { source: "rate-limit" } });
   }
 
+  const scanStatus: TaskAttachmentScanStatus | null = input.attachment_s3_key
+    ? "pending"
+    : null;
+
   const { data, error } = await supabase
     .from("tasks")
     .insert({
@@ -51,6 +59,9 @@ export async function createTask(
       attachment_url: input.attachment_url ?? null,
       attachment_s3_key: input.attachment_s3_key ?? null,
       attachment_name: input.attachment_name ?? null,
+      attachment_scan_status: scanStatus,
+      attachment_scan_verdict_at: null,
+      attachment_scan_reason: null,
     })
     .select()
     .single();

@@ -11,9 +11,13 @@ export default withSentryConfig(nextConfig, {
   // Requires SENTRY_AUTH_TOKEN to be set (see .env.example).
   widenClientFileUpload: true,
 
-  // Tree-shake Sentry debug code from client bundles.
-  disableLogger: true,
+  webpack: {
+    // Automatically instrument Next.js pages/routes (Server Component wrappers).
+    autoInstrumentServerFunctions: true,
 
-  // Automatically instrument Next.js pages/routes (Server Component wrappers).
-  autoInstrumentServerFunctions: true,
+    // Tree-shake Sentry debug code from client bundles.
+    treeshake: {
+      removeDebugLogging: true,
+    },
+  },
 });

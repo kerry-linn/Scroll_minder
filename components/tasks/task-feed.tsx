@@ -1,10 +1,22 @@
 "use client";
 
-import { CheckIcon, Link2Icon, PaperclipIcon, Trash2 } from "lucide-react";
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  Link2Icon,
+  Loader2Icon,
+  PaperclipIcon,
+  ShieldOffIcon,
+  Trash2,
+} from "lucide-react";
 import * as React from "react";
 import { toast } from "sonner";
 import { getPresignedDownloadUrl } from "@/app/actions/attachments";
 import { deleteTask } from "@/app/actions/tasks";
+import {
+  canOpenAttachment,
+  getAttachmentBlockReason,
+} from "@/lib/attachments/scan-status";
 import { formatDaysRemaining } from "@/lib/tasks/date-utils";
 import type { OptimisticTask, TaskPriority } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
@@ -33,8 +45,52 @@ function AttachmentLink({ task }: { task: OptimisticTask }) {
 
   if (!isS3 && !isUrl) return null;
 
+  // ── Scan-status UI states (S3 only) ────────────────────────────────────────
+
+  if (isS3) {
+    const scanStatus = task.attachment_scan_status;
+
+    if (task.isOptimistic || scanStatus === "pending" || scanStatus === null) {
+      return (
+        <span className="mt-1 flex items-center gap-1 text-xs text-muted-foreground/60">
+          <Loader2Icon className="size-3 shrink-0 animate-spin" />
+          <span>Scanning…</span>
+        </span>
+      );
+    }
+
+    if (scanStatus === "infected") {
+      return (
+        <span className="mt-1 flex items-center gap-1 text-xs text-destructive/80">
+          <ShieldOffIcon className="size-3 shrink-0" />
+          <span>Blocked — file flagged as malicious</span>
+        </span>
+      );
+    }
+
+    if (scanStatus === "error") {
+      return (
+        <span className="mt-1 flex items-center gap-1 text-xs text-amber-500">
+          <AlertTriangleIcon className="size-3 shrink-0" />
+          <span>Scan failed — delete and re-upload</span>
+        </span>
+      );
+    }
+  }
+
+  // ── Normal open flow (clean S3 or external URL) ────────────────────────────
+
+  const blockReason = getAttachmentBlockReason(task);
+
   async function handleOpen(e: React.MouseEvent) {
     e.stopPropagation();
+
+    if (blockReason) {
+      toast.error(blockReason);
+      return;
+    }
+
+    if (!canOpenAttachment(task)) return;
 
     if (isUrl && task.attachment_url) {
       window.open(task.attachment_url, "_blank", "noopener,noreferrer");
@@ -42,11 +98,6 @@ function AttachmentLink({ task }: { task: OptimisticTask }) {
     }
 
     if (isS3 && task.attachment_s3_key) {
-      if (task.isOptimistic) {
-        toast.error("Wait for the task to finish saving before opening.");
-        return;
-      }
-
       // Open a blank tab synchronously while the browser still trusts the
       // click gesture. Assigning its location after the await avoids the
       // async popup blocker in Chrome and Safari.

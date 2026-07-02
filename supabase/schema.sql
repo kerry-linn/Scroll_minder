@@ -7,6 +7,10 @@ do $$ begin
   create type task_status as enum ('pending', 'completed');
 exception when duplicate_object then null; end $$;
 
+do $$ begin
+  create type attachment_scan_status as enum ('pending', 'clean', 'infected', 'error');
+exception when duplicate_object then null; end $$;
+
 create table if not exists tasks (
   id               uuid           primary key default gen_random_uuid(),
   user_id          uuid           not null references auth.users(id) on delete cascade,
@@ -17,8 +21,24 @@ create table if not exists tasks (
   created_at       timestamptz    not null default now(),
   attachment_url   text,
   attachment_s3_key text,
-  attachment_name  text
+  attachment_name  text,
+  attachment_scan_status   attachment_scan_status,
+  attachment_scan_verdict_at timestamptz,
+  attachment_scan_reason   text
 );
+
+-- Migration: add scan columns to an already-existing tasks table (idempotent)
+do $$ begin
+  alter table tasks add column attachment_scan_status attachment_scan_status;
+exception when duplicate_column then null; end $$;
+
+do $$ begin
+  alter table tasks add column attachment_scan_verdict_at timestamptz;
+exception when duplicate_column then null; end $$;
+
+do $$ begin
+  alter table tasks add column attachment_scan_reason text;
+exception when duplicate_column then null; end $$;
 
 create index if not exists tasks_user_due_date_idx
   on tasks (user_id, due_date asc nulls last, created_at asc);

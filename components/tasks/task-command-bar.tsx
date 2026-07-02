@@ -28,7 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatDaysRemaining } from "@/lib/tasks/date-utils";
-import type { TaskPriority } from "@/lib/tasks/types";
+import type { TaskAttachmentScanStatus, TaskPriority } from "@/lib/tasks/types";
 import { cn } from "@/lib/utils";
 import { useTasksStore } from "@/stores/tasks-store";
 
@@ -84,6 +84,7 @@ export function TaskCommandBar() {
     let attachS3Key: string | null = null;
     let attachUrl: string | null = null;
     let attachName: string | null = null;
+    let attachScanStatus: TaskAttachmentScanStatus | null = null;
 
     if (attachmentFile) {
       setUploading(true);
@@ -116,6 +117,7 @@ export function TaskCommandBar() {
 
       attachS3Key = result.s3Key;
       attachName = attachmentFile.name;
+      attachScanStatus = "pending";
     } else if (attachmentUrl.trim()) {
       attachUrl = attachmentUrl.trim();
       try {
@@ -137,6 +139,9 @@ export function TaskCommandBar() {
       attachment_url: attachUrl,
       attachment_s3_key: attachS3Key,
       attachment_name: attachName,
+      attachment_scan_status: attachScanStatus,
+      attachment_scan_verdict_at: null,
+      attachment_scan_reason: null,
     });
 
     setTitle("");
@@ -153,6 +158,7 @@ export function TaskCommandBar() {
       attachment_s3_key: attachS3Key,
       attachment_name: attachName,
     });
+    // scan_status is derived server-side from whether an s3_key is present.
 
     setSubmitting(false);
 

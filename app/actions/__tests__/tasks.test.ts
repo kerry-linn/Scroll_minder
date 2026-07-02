@@ -57,6 +57,9 @@ describe("createTask", () => {
       attachment_url: null,
       attachment_s3_key: null,
       attachment_name: null,
+      attachment_scan_status: null,
+      attachment_scan_verdict_at: null,
+      attachment_scan_reason: null,
     };
 
     supabaseMock.from.mockReturnValue({
@@ -73,6 +76,88 @@ describe("createTask", () => {
 
     expect(result.success).toBe(true);
     if (result.success) expect(result.task.title).toBe("My task");
+  });
+
+  it("inserts attachment_scan_status=pending when an s3 key is provided", async () => {
+    supabaseMock.auth.getUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+    });
+
+    const insertMock = vi.fn().mockReturnThis();
+    const fakeTask = {
+      id: "task-2",
+      user_id: "user-1",
+      title: "File task",
+      due_date: null,
+      priority: "low",
+      status: "pending",
+      created_at: new Date().toISOString(),
+      attachment_url: null,
+      attachment_s3_key: "user-1/uuid-file.pdf",
+      attachment_name: "file.pdf",
+      attachment_scan_status: "pending",
+      attachment_scan_verdict_at: null,
+      attachment_scan_reason: null,
+    };
+
+    supabaseMock.from.mockReturnValue({
+      insert: insertMock,
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: fakeTask, error: null }),
+    });
+
+    await createTask({
+      title: "File task",
+      due_date: null,
+      priority: "low",
+      attachment_s3_key: "user-1/uuid-file.pdf",
+      attachment_name: "file.pdf",
+    });
+
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ attachment_scan_status: "pending" })
+    );
+  });
+
+  it("inserts attachment_scan_status=null for URL-only attachments", async () => {
+    supabaseMock.auth.getUser.mockResolvedValue({
+      data: { user: { id: "user-1" } },
+    });
+
+    const insertMock = vi.fn().mockReturnThis();
+    const fakeTask = {
+      id: "task-3",
+      user_id: "user-1",
+      title: "Link task",
+      due_date: null,
+      priority: "low",
+      status: "pending",
+      created_at: new Date().toISOString(),
+      attachment_url: "https://example.com",
+      attachment_s3_key: null,
+      attachment_name: "example.com",
+      attachment_scan_status: null,
+      attachment_scan_verdict_at: null,
+      attachment_scan_reason: null,
+    };
+
+    supabaseMock.from.mockReturnValue({
+      insert: insertMock,
+      select: vi.fn().mockReturnThis(),
+      single: vi.fn().mockResolvedValue({ data: fakeTask, error: null }),
+    });
+
+    await createTask({
+      title: "Link task",
+      due_date: null,
+      priority: "low",
+      attachment_url: "https://example.com",
+      attachment_name: "example.com",
+    });
+
+    expect(insertMock).toHaveBeenCalledWith(
+      expect.objectContaining({ attachment_scan_status: null })
+    );
   });
 
   it("returns an error when the DB insert fails", async () => {

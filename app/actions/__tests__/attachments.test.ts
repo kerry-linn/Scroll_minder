@@ -47,6 +47,18 @@ const { getPresignedDownloadUrl } = await import(
 const USER_ID = "user-abc";
 const S3_KEY = `${USER_ID}/some-uuid-file.pdf`;
 
+// Helper: mock the Supabase task row returned by the scan-status query.
+function mockTaskScanRow(scanStatus: string | null) {
+  supabaseMock.from.mockReturnValue({
+    select: vi.fn().mockReturnThis(),
+    eq: vi.fn().mockReturnThis(),
+    single: vi.fn().mockResolvedValue({
+      data: { attachment_scan_status: scanStatus },
+      error: null,
+    }),
+  });
+}
+
 describe("getPresignedDownloadUrl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -55,7 +67,9 @@ describe("getPresignedDownloadUrl", () => {
     });
   });
 
-  it("returns the signed URL for an owned key", async () => {
+  it("returns the signed URL for a clean owned key", async () => {
+    mockTaskScanRow("clean");
+
     const result = await getPresignedDownloadUrl(S3_KEY);
 
     expect(result.success).toBe(true);
@@ -80,5 +94,56 @@ describe("getPresignedDownloadUrl", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error).toMatch(/not authenticated/i);
+  });
+
+  it("blocks download when scan status is pending", async () => {
+    mockTaskScanRow("pending");
+
+    const result = await getPresignedDownloadUrl(S3_KEY);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toMatch(/scan/i);
+  });
+
+  it("blocks download when scan status is null (not yet scanned)", async () => {
+    mockTaskScanRow(null);
+
+    const result = await getPresignedDownloadUrl(S3_KEY);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toMatch(/scan/i);
+  });
+
+  it("blocks download when scan status is infected", async () => {
+    mockTaskScanRow("infected");
+
+    const result = await getPresignedDownloadUrl(S3_KEY);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toMatch(/malicious/i);
+  });
+
+  it("blocks download when scan status is error", async () => {
+    mockTaskScanRow("error");
+
+    const result = await getPresignedDownloadUrl(S3_KEY);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toMatch(/scan failed/i);
+  });
+
+  it("returns attachment-not-found when no task row matches", async () => {
+    supabaseMock.from.mockReturnValue({
+      select: vi.fn().mockReturnThis(),
+      eq: vi.fn().mockReturnThis(),
+      single: vi
+        .fn()
+        .mockResolvedValue({ data: null, error: { message: "not found" } }),
+    });
+
+    const result = await getPresignedDownloadUrl(S3_KEY);
+
+    expect(result.success).toBe(false);
+    if (!result.success) expect(result.error).toMatch(/not found/i);
   });
 });

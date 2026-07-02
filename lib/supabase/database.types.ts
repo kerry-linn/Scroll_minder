@@ -68,6 +68,11 @@ export type Database = {
           attachment_name: string | null;
           attachment_s3_key: string | null;
           attachment_url: string | null;
+          attachment_scan_status:
+            | Database["public"]["Enums"]["attachment_scan_status"]
+            | null;
+          attachment_scan_verdict_at: string | null;
+          attachment_scan_reason: string | null;
           created_at: string;
           due_date: string | null;
           id: string;
@@ -80,6 +85,11 @@ export type Database = {
           attachment_name?: string | null;
           attachment_s3_key?: string | null;
           attachment_url?: string | null;
+          attachment_scan_status?:
+            | Database["public"]["Enums"]["attachment_scan_status"]
+            | null;
+          attachment_scan_verdict_at?: string | null;
+          attachment_scan_reason?: string | null;
           created_at?: string;
           due_date?: string | null;
           id?: string;
@@ -92,6 +102,11 @@ export type Database = {
           attachment_name?: string | null;
           attachment_s3_key?: string | null;
           attachment_url?: string | null;
+          attachment_scan_status?:
+            | Database["public"]["Enums"]["attachment_scan_status"]
+            | null;
+          attachment_scan_verdict_at?: string | null;
+          attachment_scan_reason?: string | null;
           created_at?: string;
           due_date?: string | null;
           id?: string;
@@ -110,6 +125,7 @@ export type Database = {
       [_ in never]: never;
     };
     Enums: {
+      attachment_scan_status: "pending" | "clean" | "infected" | "error";
       task_priority: "low" | "medium" | "high";
       task_status: "pending" | "completed";
     };
@@ -242,6 +258,8 @@ export type CompositeTypes<
 export type TaskRow = Database["public"]["Tables"]["tasks"]["Row"];
 export type TaskPriority = Database["public"]["Enums"]["task_priority"];
 export type TaskStatus = Database["public"]["Enums"]["task_status"];
+export type TaskAttachmentScanStatus =
+  Database["public"]["Enums"]["attachment_scan_status"];
 
 export const Constants = {
   graphql_public: {
@@ -249,6 +267,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      attachment_scan_status: ["pending", "clean", "infected", "error"],
       task_priority: ["low", "medium", "high"],
       task_status: ["pending", "completed"],
     },

@@ -114,6 +114,42 @@ export async function getPresignedDownloadUrl(
     return { success: false, error: ownershipCheck.error };
   }
 
+  // Enforce scan gate: only allow downloads for clean attachments.
+  const { data: taskRow, error: taskFetchError } = await supabase
+    .from("tasks")
+    .select("attachment_scan_status")
+    .eq("attachment_s3_key", s3Key)
+    .eq("user_id", user.id)
+    .single();
+
+  if (taskFetchError || !taskRow) {
+    return { success: false, error: "Attachment not found." };
+  }
+
+  const scanStatus = taskRow.attachment_scan_status;
+
+  if (scanStatus === "pending" || scanStatus === null) {
+    return {
+      success: false,
+      error:
+        "This file is being scanned for malware. Please try again shortly.",
+    };
+  }
+
+  if (scanStatus === "infected") {
+    return {
+      success: false,
+      error: "This file was flagged as malicious and cannot be opened.",
+    };
+  }
+
+  if (scanStatus === "error") {
+    return {
+      success: false,
+      error: "Scan failed. Please delete the attachment and re-upload.",
+    };
+  }
+
   const command = new GetObjectCommand({ Bucket: aws.bucket, Key: s3Key });
 
   try {
